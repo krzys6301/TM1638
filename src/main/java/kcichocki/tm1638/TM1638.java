@@ -24,50 +24,46 @@ public class TM1638 {
 
 	// definition of letters for the display
 	private final Font font = new Font();
+	private final byte dot = font.translateChar('.');
 	private byte lastButtons = 0;
 
 	/**
-	 * @param dio
-	 *            Data I/O GPIO
-	 * @param clk
-	 *            clock GPIO
-	 * @param stb
-	 *            Chip Select GPIO
-	 * @param brightness
-	 *            brightness of the display (between 0 and 7)
+	 * @param dio        Data I/O GPIO
+	 * @param clk        clock GPIO
+	 * @param stb        Chip Select GPIO
+	 * @param brightness brightness of the display (between 0 and 7)
 	 */
 	public TM1638(Pin dio, Pin clk, Pin stb, int brightness) {
 		final GpioController gpio = GpioFactory.getInstance();
 		this.dio = gpio.provisionDigitalMultipurposePin(dio, "dio", PinMode.DIGITAL_INPUT);
 		this.clk = gpio.provisionDigitalOutputPin(clk, "clk", PinState.HIGH);
 		this.stb = gpio.provisionDigitalOutputPin(stb, "stb", PinState.HIGH);
-		turnOn((byte) brightness);
+		setBrightness((byte) brightness);
 		clearDisplay();
 	}
 
-	public void displayText(String text, boolean padRight) {
-		String paddedText;// = String.format("%1$" + 8 + "s", text);
-
-		int spacesNeeded = 8 - text.replace(".", "").length();
-		if (padRight) {
-			paddedText = String.format("%-" + (8 + spacesNeeded) + "s", text);
-		} else {
-			paddedText = String.format("%" + (8 + spacesNeeded) + "s", text);
-		}
-
+	/**
+	 * displays a text on 8 char display, signs are written from left to right,
+	 * there could be a dot after each sign, it will be added to this sign. if the
+	 * text is shorter than the display, the remainding registers will be leaved as
+	 * they are, meaning no update. If needed to pad text to left, then string
+	 * should be padded to be 8 chars long.
+	 * 
+	 * @param text - text to be displayed.
+	 */
+	public void displayText(String text) {
 		int stringPos = 0;
-		for (int index = 0; index < 8; index++) {
+		for (int index = 0; index < Math.min(8, text.length()); index++) {
 			byte displayRegister = (byte) ((index % 8) * 2);
-			byte c = font.translateChar(paddedText.charAt(stringPos));
-			if (c != font.translateChar('.') && stringPos + 1 < paddedText.length()) {
-				if (paddedText.charAt(stringPos + 1) == '.') {
-					c = (byte) (c | font.translateChar('.'));
-					// System.out.println("found a dot");
+			byte characterToDisplay = font.translateChar(text.charAt(stringPos));
+			if (characterToDisplay != dot && stringPos + 1 < text.length()) {
+				if (text.charAt(stringPos + 1) == '.') {
+					characterToDisplay = (byte) (characterToDisplay | dot);
 					stringPos++;
 				}
 
 			}
-			sendData(displayRegister, c);
+			sendData(displayRegister, characterToDisplay);
 			stringPos++;
 		}
 	}
@@ -96,25 +92,30 @@ public class TM1638 {
 		return (byte) (Integer.reverse(x) >> 24);
 	}
 
-	public void setLed(int index, boolean on) {
+	/**
+	 * turns on a led
+	 * @param index - the index of led to be turned on, valid range is 0 to 7
+	 */
+	public void ledOn(int index) {
+		setLed(index, 1);
+	}
+	/**
+	 * turns off a led
+	 * @param index - the index of led to be turned on, valid range is 0 to 7
+	 */
+	public void ledOff(int index) {
+		setLed(index, 0);
+	}
+
+	private void setLed(int index, int enabled) {
 		byte ledRegister = (byte) ((index % 8) * 2 + 1);
-		sendData(ledRegister, (byte) (on ? 1 : 0));
+		sendData(ledRegister, (byte) enabled);
 	}
 
 	public void clearDisplay() {
-		// stb.low();
-		// setDataMode(WRITE_MODE, INCR_ADDR); // set data read mode (automatic address
-		// increased)
-		// sendByte((byte) 0x00); // address command set to the 1st address
-		// for (byte idx = 0; idx < 16; idx++) {
-		// sendByte((byte) 0x00); // set to zero all the addresses
-		// stb.high();
-		// }
-
 		for (byte idx = 0; idx < 16; idx++) {
-			sendData(idx, (byte) 0x00); // set to zero all the addresses
+			sendData(idx, (byte) 0x00);
 		}
-
 	}
 
 	public void turnOff() {
@@ -132,10 +133,9 @@ public class TM1638 {
 	 * <li>6 => 13/16
 	 * <li>7 => 14/16
 	 * 
-	 * @param brightness
-	 *            between 0 and 7
+	 * @param brightness between 0 and 7
 	 */
-	public void turnOn(int brightness) {
+	public void setBrightness(int brightness) {
 		sendCommand((byte) (0x88 | (brightness & 7)));
 	}
 
@@ -146,16 +146,13 @@ public class TM1638 {
 	}
 
 	/**
-	 * @param addr
-	 *            adress of the data
-	 * @param data
-	 *            value of the data
+	 * @param addr adress of the data
+	 * @param data value of the data
 	 */
 	private void sendData(byte addr, byte data) {
 		stb.low();
 		setDataMode(WRITE_MODE, FIXED_ADDR);
 		stb.high();
-		// set address and send byte (stb must go high and low before sending address)
 		stb.low();
 		sendByte((byte) (0xC0 | addr));
 		sendByte(data);
@@ -185,10 +182,8 @@ public class TM1638 {
 	}
 
 	/**
-	 * @param wr_mode
-	 *            READ_MODE (read the key scan) or WRITE_MODE (write data)
-	 * @param addr_mode
-	 *            INCR_ADDR (automatic address increased) or FIXED_ADDR
+	 * @param wr_mode   READ_MODE (read the key scan) or WRITE_MODE (write data)
+	 * @param addr_mode INCR_ADDR (automatic address increased) or FIXED_ADDR
 	 */
 	private void setDataMode(byte wr_mode, byte addr_mode) {
 		sendByte((byte) (0x40 | wr_mode | addr_mode));
