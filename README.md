@@ -1,5 +1,4 @@
-This is a java project for serving the TM1368 display board.
-Feel free to contribute, license is open, project can be modified, distributed, sell etc, the only requirement is to leave a note from where it has been originally created. Please be aware that you are using this software on your resposibility, and I'm not responsible for any direct or indirect damage or any other issue it might create in any way.
+This is a pure java library for serving the TM1368 display board.
 
 example of usage:
 
