@@ -1,4 +1,8 @@
 This is a pure java library for serving the TM1368 display board on raspberry pi platform.
+It allows to 
+* display numbers/text/dots 
+* set leds ON/OFF
+* read the buttons pressed.
 
 example of usage:
 
