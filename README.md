@@ -1,4 +1,4 @@
-This is a pure java library for serving the TM1368 display board.
+This is a pure java library for serving the TM1368 display board on raspberry pi platform.
 
 example of usage:
 
